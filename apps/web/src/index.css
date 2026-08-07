@@ -1,0 +1,332 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/sora';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens for the "Electric Nightscape" design system.
+ * `:root` holds the light palette (derived from the same brand hues) and
+ * `.dark` holds the original Electric Nightscape dark palette — toggled by
+ * adding/removing the `dark` class on `<html>` (see stores/theme-store.ts).
+ */
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Sora Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  /* Neon accents beyond the shadcn base palette, used for the "electric" layer
+     (active/social elements, focus glows, category chips). */
+  --color-neon-pink: var(--neon-pink);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-violet: var(--neon-violet);
+  --color-neon-amber: var(--neon-amber);
+  --color-neon-emerald: var(--neon-emerald);
+  --color-neon-blue: var(--neon-blue);
+  /* Sequential single-hue ramp for the consistency heatmap. Steps are
+     validated per theme (monotone lightness, adjacent ΔL >= 0.06, light end
+     clears 2:1 on its surface) — do not hand-tweak one step in isolation. */
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* --- Material-3-style surface/outline scale, straight from the
+     "Electric Nightscape" screens — lets components reuse the same class
+     names (bg-surface-container, text-on-surface-variant, ...) the design
+     was authored with. --- */
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --color-error-container: var(--error-container);
+
+  /* --- Spacing rhythm (8px base unit) --- */
+  --spacing-base: 8px;
+  --spacing-card-gap: 20px;
+  --spacing-gutter: 24px;
+  --spacing-container-padding: 32px;
+  --spacing-section-margin: 48px;
+
+  /* --- Type scale --- */
+  --text-display-lg: 48px;
+  --text-display-lg--line-height: 56px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-lg--font-weight: 600;
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 32px;
+  --text-headline-lg-mobile--font-weight: 600;
+  --text-title-md: 20px;
+  --text-title-md--line-height: 28px;
+  --text-title-md--font-weight: 600;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 20px;
+  --text-label-caps: 12px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--letter-spacing: 0.05em;
+  --text-label-caps--font-weight: 700;
+}
+
+:root {
+  /* Light neutrals are cool greys aligned to the #1a1d2e navy ink. They were
+     warm/mauve (inherited from the Material seed), which read as dingy next
+     to the pink primary. --primary itself is unchanged across themes. */
+  --background: #fbfbfd;
+  --foreground: #1a1d2e;
+  --card: #ffffff;
+  --card-foreground: #1a1d2e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1d2e;
+  --primary: #ff2d78;
+  --primary-foreground: #ffffff;
+  --secondary: #e8e9f0;
+  --secondary-foreground: #1a1d2e;
+  --muted: #eef0f5;
+  --muted-foreground: #4a4f63;
+  --accent: #eef0f5;
+  --accent-foreground: #1a1d2e;
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: #ffffff;
+  --ring: #0891a8;
+  --chart-1: #ff2d78;
+  --chart-2: #0891a8;
+  --chart-3: #7000ff;
+  --chart-4: #d1447a;
+  --chart-5: #7a4ecf;
+  --radius: 1rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1d2e;
+  --sidebar-primary: #ff2d78;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f1f7;
+  --sidebar-accent-foreground: #1a1d2e;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --sidebar-ring: #0891a8;
+  --neon-pink: #ff2d78;
+  --neon-cyan: #0891a8;
+  --neon-violet: #7000ff;
+  --neon-amber: #f5a623;
+  --neon-emerald: #00c896;
+  --neon-blue: #3b82f6;
+  /* Light ramp runs light -> dark (more activity = darker on a white page). */
+  --heat-1: #55c2d6;
+  --heat-2: #26a5bd;
+  --heat-3: #10859c;
+  --heat-4: #076372;
+  --surface: #f7f7fb;
+  --surface-dim: #e5e6ee;
+  --surface-bright: #ffffff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f7f7fb;
+  --surface-container: #f0f1f7;
+  --surface-container-high: #e8e9f0;
+  --surface-container-highest: #e0e1ea;
+  --on-surface: #1a1d2e;
+  --on-surface-variant: #4a4f63;
+  --outline: #8a90a6;
+  --outline-variant: #dcdfe8;
+  --primary-container: #ffd9df;
+  --on-primary-container: #3f0017;
+  --secondary-container: #b3f2f8;
+  --on-secondary-container: #00363a;
+  --tertiary: #6320c9;
+  --tertiary-container: #e9ddff;
+  --on-tertiary-container: #23005b;
+  --error-container: #ffdad6;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0f111a;
+  --foreground: #e1e1ef;
+  --card: #1a1d2e;
+  --card-foreground: #e1e1ef;
+  --popover: #1a1d2e;
+  --popover-foreground: #e1e1ef;
+  --primary: #ff2d78;
+  --primary-foreground: #ffffff;
+  --secondary: #282933;
+  --secondary-foreground: #e1e1ef;
+  --muted: #1d1f29;
+  --muted-foreground: #e4bdc3;
+  --accent: #282933;
+  --accent-foreground: #e1e1ef;
+  --destructive: #93000a;
+  --destructive-foreground: #ffdad6;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: #0f111a;
+  --ring: #00f0ff;
+  --chart-1: #ff2d78;
+  --chart-2: #00f0ff;
+  --chart-3: #7000ff;
+  --chart-4: #ffb1c0;
+  --chart-5: #a178ff;
+  --sidebar: #0c0e17;
+  --sidebar-foreground: #e1e1ef;
+  --sidebar-primary: #ff2d78;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1d2e;
+  --sidebar-accent-foreground: #e1e1ef;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #00f0ff;
+  --neon-pink: #ff2d78;
+  --neon-cyan: #00f0ff;
+  --neon-violet: #7000ff;
+  --neon-amber: #f5a623;
+  --neon-emerald: #00c896;
+  --neon-blue: #3b82f6;
+  /* Dark ramp runs dark -> bright (more activity = brighter on a dark page). */
+  --heat-1: #0c6a7a;
+  --heat-2: #0f9cb3;
+  --heat-3: #1fc7db;
+  --heat-4: #66ecf7;
+  --surface: #11131c;
+  --surface-dim: #11131c;
+  --surface-bright: #373943;
+  --surface-container-lowest: #0c0e17;
+  --surface-container-low: #191b24;
+  --surface-container: #1d1f29;
+  --surface-container-high: #282933;
+  --surface-container-highest: #32343e;
+  --on-surface: #e1e1ef;
+  --on-surface-variant: #e4bdc3;
+  --outline: #ab888e;
+  --outline-variant: #5b3f44;
+  --primary-container: #ff4c83;
+  --on-primary-container: #5a0023;
+  --secondary-container: #00eefc;
+  --on-secondary-container: #00686f;
+  --tertiary: #d1bcff;
+  --tertiary-container: #a178ff;
+  --on-tertiary-container: #34007f;
+  --error-container: #93000a;
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  /* Recurring "electric" treatments from the design screens — a glowing
+     border/text pairing for the primary (pink) and secondary (cyan) accents,
+     and the translucent card used for elevated panels.
+     The colors stay theme-aware, but every *glow* is dark-only: a bloom needs
+     a dark backdrop to read as light. On a white page the same shadow reads as
+     a smudge / print misregistration, so it is gated behind `.dark`. */
+  .neon-border-primary {
+    border-color: var(--neon-pink);
+  }
+  .neon-text-primary {
+    color: var(--neon-pink);
+  }
+  .neon-border-secondary {
+    border-color: var(--neon-cyan);
+  }
+  .neon-text-secondary {
+    color: var(--neon-cyan);
+  }
+
+  :where(.dark) {
+    .neon-border-primary {
+      box-shadow: 0 0 10px rgba(255, 45, 120, 0.3);
+    }
+    .neon-text-primary {
+      text-shadow: 0 0 8px rgba(255, 45, 120, 0.4);
+    }
+    .neon-border-secondary {
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    }
+    .neon-text-secondary {
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+    }
+  }
+
+  .glass-card {
+    background: rgba(26, 29, 46, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Section/page title "neon sign" treatment: layered text-shadow blur radii
+     in the primary/neon-pink accent, like a lit lamp tube. Applied to the
+     shared `PageHeader` title ("My Tasks", "Calendar", ...) — always on,
+     there's no completion state at the page-header level. Dark-only for the
+     same reason as the neon utilities above. */
+  :where(.dark) .section-title-glow {
+    text-shadow:
+      0 0 2px rgba(255, 45, 120, 0.85),
+      0 0 6px rgba(255, 45, 120, 0.55),
+      0 0 14px rgba(255, 45, 120, 0.35),
+      0 0 26px rgba(255, 45, 120, 0.18);
+  }
+}

@@ -1,0 +1,19 @@
+name: Deploy
+
+# Dispara só depois que o workflow CI terminou com sucesso em main — não em
+# paralelo ao push (por isso não é `on: push`). Requer desligar o
+# "Auto-Deploy" nativo do Render (dashboard do serviço), senão o Render
+# pode deployar um commit que a CI ainda vai reprovar, contornando o gate.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar deploy no Render
+        run: curl -sf -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"

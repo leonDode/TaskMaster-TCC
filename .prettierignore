@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/*.min.js
+.claude
+.turbo
+pnpm-lock.yaml

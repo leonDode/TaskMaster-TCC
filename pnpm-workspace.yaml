@@ -1,0 +1,19 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  unrs-resolver: true
+# Todas as entradas abaixo são dependências transitivas (nenhuma é declarada
+# diretamente pelo projeto) com advisory de severidade high — o `pnpm audit
+# --audit-level=high` do job security-gate falha sem elas. Os overrides de
+# js-yaml e fast-uri são presos à major line de quem os consome: js-yaml 4
+# removeu `safeLoad`, ainda usado por dependentes da 3.x, e o ajv espera
+# fast-uri ^3, então um `>=` solto puxaria uma major incompatível.
+overrides:
+  find-my-way: '>=9.6.1'
+  brace-expansion: '>=5.0.9' # GHSA-rgw5-rvv9-x895
+  fast-uri@3: '^3.1.5' # GHSA-7p8r-x3mc-p8w7
+  js-yaml@3: '^3.15.1' # GHSA-5p4m-2wfm-xmqj
+  js-yaml@4: '^4.3.1' # GHSA-5p4m-2wfm-xmqj

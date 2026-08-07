@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: a connection string não vive mais aqui. O CLI (migrate/db push)
+// lê a URL de `prisma.config.ts` (mapeada para DIRECT_URL — sessão estável,
+// necessária para DDL/advisory locks). O runtime da aplicação usa um driver
+// adapter (`@prisma/adapter-pg`) instanciado em PrismaService com
+// DATABASE_URL (transaction pooler). Ver prisma.config.ts e
+// src/prisma/prisma.service.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// Espelha auth.users do Supabase pelo mesmo uuid. Nunca duplicar lógica de
+// auth aqui, só perfil de exibição. Provisionado via JIT upsert na guard
+// (ver AuthModule / UsersService.syncFromClaims).
+model User {
+  id          String   @id @db.Uuid
+  email       String   @unique
+  displayName String?  @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  // IANA tz (ex. "America/Sao_Paulo"). Não consumido pela expansão de
+  // recorrência em si (que é alheia a timezone); reservado para quando o
+  // backend precisar resolver "hoje" sozinho (notificações, resumos por
+  // e-mail) — não implementado ainda.
+  timezone    String   @default("UTC")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tasks        Task[]
+  categories   Category[]
+  groupMembers GroupMember[]
+
+  @@map("users")
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+
+  @@map("group_role")
+}
+
+// DONE não existe aqui — conclusão é 100% derivada da existência de uma
+// TaskCompletion. Este enum só marca estado de fluxo pré-conclusão,
+// independente de "está concluída ou não".
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+
+  @@map("task_status")
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+
+  @@map("recurrence_frequency")
+}
+
+// Os três enums abaixo são espelhados em packages/shared/src/task-taxonomy.ts
+// (o front não pode importar @prisma/client). A duplicação é intencional e
+// guardada por apps/api/src/common/taxonomy.spec.ts, que quebra se um lado
+// ganhar um valor que o outro não tem.
+
+// Escolhido na criação e imutável depois — progresso acumulado mudaria de
+// sentido se o tipo pudesse virar (mesma lógica de recurrenceFrequency).
+enum TaskKind {
+  BOOLEAN
+  QUANTITATIVE
+
+  @@map("task_kind")
+}
+
+// Catálogo fechado. GENERIC_UNIT ("unidades") é o fallback genérico.
+enum UnitType {
+  ML
+  LITERS
+  GRAMS
+  KG
+  KM
+  METERS
+  STEPS
+  MINUTES
+  HOURS
+  REPS
+  PAGES
+  GLASSES
+  CALORIES
+  GENERIC_UNIT
+
+  @@map("unit_type")
+}
+
+enum CategoryType {
+  FITNESS
+  HEALTH
+  HYGIENE
+  NUTRITION
+  STUDY
+  WORK
+  HOME
+  OTHER
+
+  @@map("category_type")
+}
+
+model Category {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+
+  // Conceito separado de `name` (que continua livre): alimenta a sugestão de
+  // unidades da UI. Sem @default de propósito — categoria sem tipo quebraria
+  // essa sugestão, então é obrigatório informar na criação.
+  type CategoryType
+
+  color     String? // hex, para chips/badges na UI
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tasks Task[]
+
+  @@unique([userId, name])
+  @@map("categories")
+}
+
+model Task {
+  id          String     @id @default(uuid()) @db.Uuid
+  userId      String     @map("user_id") @db.Uuid
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId  String?    @map("category_id") @db.Uuid
+  category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  status      TaskStatus @default(TODO) // estado de fluxo, independente de conclusão
+
+  // --- tipo da task; imutável após criar ---
+  // BOOLEAN: conclusão é a existência de uma TaskCompletion (comportamento
+  // original). QUANTITATIVE: acumula valor em TaskProgress e a TaskCompletion
+  // só nasce quando value >= targetValue.
+  kind        TaskKind  @default(BOOLEAN)
+  targetValue Decimal?  @map("target_value") @db.Decimal(12, 2)
+  unit        UnitType?
+
+  // --- modo avulso (recurrenceFrequency == null) ---
+  // Data pura (sem hora), para casar com occurrenceDate/recurrence*Date.
+  dueDate DateTime? @map("due_date") @db.Date
+
+  // --- modo recorrente (recurrenceFrequency != null); imutável após criar ---
+  recurrenceFrequency  RecurrenceFrequency? @map("recurrence_frequency")
+  recurrenceDaysOfWeek Int[]                @map("recurrence_days_of_week") // WEEKLY: 0=dom..6=sáb
+  recurrenceDayOfMonth Int?                 @map("recurrence_day_of_month") // MONTHLY/YEARLY, 1-31
+  recurrenceMonth      Int?                 @map("recurrence_month") // YEARLY, 1-12
+  recurrenceStartDate  DateTime?            @map("recurrence_start_date") @db.Date
+  recurrenceEndDate    DateTime?            @map("recurrence_end_date") @db.Date // null = infinita
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  completions TaskCompletion[]
+  progress    TaskProgress[]
+
+  @@index([userId, categoryId])
+  @@index([userId, dueDate])
+  @@index([userId, recurrenceFrequency])
+  @@map("tasks")
+}
+
+// Fonte única de verdade de conclusão para TODA task (avulsa ou recorrente).
+// Avulsa com dueDate -> occurrenceDate = dueDate. Avulsa sem dueDate ->
+// occurrenceDate = DATE(createdAt) (fallback determinístico e imutável).
+// Recorrente -> occurrenceDate = uma data computada por expandOccurrences.
+model TaskCompletion {
+  id             String   @id @default(uuid()) @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  occurrenceDate DateTime @map("occurrence_date") @db.Date
+  completedAt    DateTime @default(now()) @map("completed_at")
+
+  // no máx. 1 conclusão por ocorrência — vale tanto para o único "dia" de
+  // uma task avulsa quanto para cada dia de uma task recorrente
+  @@unique([taskId, occurrenceDate])
+  @@map("task_completions")
+}
+
+// Progresso parcial de uma task QUANTITATIVE. Existe como tabela separada
+// justamente para NÃO violar o invariante acima (linha em TaskCompletion =
+// concluída): aqui mora o "1,5 de 2 L", e a TaskCompletion continua
+// significando "feito". Tasks BOOLEAN nunca têm linha aqui.
+model TaskProgress {
+  id             String   @id @default(uuid()) @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  task           Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  occurrenceDate DateTime @map("occurrence_date") @db.Date
+  value          Decimal  @default(0) @db.Decimal(12, 2)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Mesma granularidade de TaskCompletion — uma linha de progresso por
+  // ocorrência.
+  @@unique([taskId, occurrenceDate])
+  @@map("task_progress")
+}
+
+model Group {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  inviteCode  String   @unique @map("invite_code")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members    GroupMember[]
+  challenges Challenge[]
+
+  @@map("groups")
+}
+
+// Sem Group.ownerId: o dono é derivado de GroupMember.role = OWNER (fonte
+// única de verdade). Índice único parcial "1 owner por grupo" via SQL bruto
+// na migration (não expressável na DSL do Prisma) — ver migration.sql.
+model GroupMember {
+  id       String    @id @default(uuid()) @db.Uuid
+  groupId  String    @map("group_id") @db.Uuid
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String    @map("user_id") @db.Uuid
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now()) @map("joined_at")
+
+  createdChallenges    Challenge[]
+  challengeCompletions ChallengeCompletion[]
+  challengeProgress    ChallengeProgress[]
+
+  // Também serve como lookup O(1) de autorização: "user X é membro do grupo Y?"
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+model Challenge {
+  id                String       @id @default(uuid()) @db.Uuid
+  groupId           String       @map("group_id") @db.Uuid
+  group             Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  startAt           DateTime     @map("start_at")
+  endAt             DateTime     @map("end_at")
+  createdByMemberId String?      @map("created_by_member_id") @db.Uuid
+  createdByMember   GroupMember? @relation(fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  tasks       ChallengeTask[]
+  completions ChallengeCompletion[]
+  progress    ChallengeProgress[]
+
+  @@index([groupId, startAt, endAt])
+  @@map("challenges")
+}
+
+model ChallengeTask {
+  id          String    @id @default(uuid()) @db.Uuid
+  challengeId String    @map("challenge_id") @db.Uuid
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  points      Int       @default(1) // reservado p/ pontuação ponderada futura; MVP sempre 1
+
+  // Mesma semântica de Task.kind. Sem noção de categoria aqui: Category é
+  // estritamente pessoal (@@unique([userId, name])) e não faz sentido num
+  // contexto de grupo — a UI do desafio mostra o catálogo global de unidades.
+  kind        TaskKind  @default(BOOLEAN)
+  targetValue Decimal?  @map("target_value") @db.Decimal(12, 2)
+  unit        UnitType?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  completions ChallengeCompletion[]
+  progress    ChallengeProgress[]
+
+  @@index([challengeId])
+  @@map("challenge_tasks")
+}
+
+// challengeId é denormalizado (derivável via challengeTaskId -> challenge)
+// de propósito: é a query mais consultada (leaderboard, polling 60-120s por
+// todo membro ativo), evita join extra na hot path.
+model ChallengeCompletion {
+  id              String        @id @default(uuid()) @db.Uuid
+  challengeId     String        @map("challenge_id") @db.Uuid
+  challenge       Challenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeTaskId String        @map("challenge_task_id") @db.Uuid
+  challengeTask   ChallengeTask @relation(fields: [challengeTaskId], references: [id], onDelete: Cascade)
+  groupMemberId   String        @map("group_member_id") @db.Uuid
+  groupMember     GroupMember   @relation(fields: [groupMemberId], references: [id], onDelete: Cascade)
+  completedAt     DateTime      @default(now()) @map("completed_at")
+  completedOn     DateTime      @map("completed_on") @db.Date // dia calendário UTC, calculado pela app
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // no máx. 1 conclusão por tarefa/membro/dia — impede inflar o placar
+  @@unique([challengeTaskId, groupMemberId, completedOn])
+  @@index([challengeId, groupMemberId])
+  @@map("challenge_completions")
+}
+
+// Equivalente de TaskProgress no lado do grupo. Usa `progressOn` (dia
+// calendário UTC) para casar com ChallengeCompletion.completedOn — a
+// assimetria com o dia local de TaskProgress é a mesma que já existe entre
+// TaskCompletion e ChallengeCompletion, e é intencional (ver
+// challenges.service.ts, todayUtcDate).
+//
+// O leaderboard AGREGA esta tabela: uma ChallengeTask QUANTITATIVE é rankeada
+// por SUM(value) no período, não por contagem de conclusões — progresso
+// parcial pontua. Tasks BOOLEAN continuam vindo de ChallengeCompletion.
+//
+// challengeId é denormalizado pelo mesmo motivo que em ChallengeCompletion:
+// é caminho quente (polling do leaderboard), evita join com challenge_tasks.
+model ChallengeProgress {
+  id              String        @id @default(uuid()) @db.Uuid
+  challengeId     String        @map("challenge_id") @db.Uuid
+  challenge       Challenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeTaskId String        @map("challenge_task_id") @db.Uuid
+  challengeTask   ChallengeTask @relation(fields: [challengeTaskId], references: [id], onDelete: Cascade)
+  groupMemberId   String        @map("group_member_id") @db.Uuid
+  groupMember     GroupMember   @relation(fields: [groupMemberId], references: [id], onDelete: Cascade)
+  progressOn      DateTime      @map("progress_on") @db.Date
+  value           Decimal       @default(0) @db.Decimal(12, 2)
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@unique([challengeTaskId, groupMemberId, progressOn])
+  // Cobre filtro + agrupamento da agregação do leaderboard inteiros.
+  // `progressOn` fica de fora de propósito: a agregação não filtra por data —
+  // a janela do desafio já é garantida na escrita.
+  @@index([challengeId, challengeTaskId, groupMemberId])
+  @@map("challenge_progress")
+}

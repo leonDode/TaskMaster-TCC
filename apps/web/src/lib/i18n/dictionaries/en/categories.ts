@@ -1,0 +1,53 @@
+import type { NamespaceDictionary } from '../../types';
+
+const categories = {
+  title: 'Categories',
+  manageDescription: {
+    one: 'Manage your {count} category',
+    other: 'Manage your {count} categories',
+  },
+  loadingLabel: 'Loading categories…',
+  emptyTitle: 'No categories yet',
+  emptyDescription: 'Categories help you organize and filter your tasks.',
+  newCategoryButton: 'New Category',
+  newCategoryCard: 'New category',
+  editAction: 'Edit',
+  deleteAction: 'Delete',
+  taskCount: { one: '{count} task', other: '{count} tasks' },
+  editCategoryDialogTitle: 'Edit category',
+  createCategoryDialogTitle: 'New category',
+  nameLabel: 'Name',
+  namePlaceholder: 'e.g. Work',
+  typeLabel: 'Type',
+  typePlaceholder: 'Choose a type',
+  typeOptions: {
+    FITNESS: 'Fitness',
+    HEALTH: 'Health',
+    HYGIENE: 'Hygiene',
+    NUTRITION: 'Nutrition',
+    STUDY: 'Study',
+    WORK: 'Work',
+    HOME: 'Home',
+    OTHER: 'Other',
+  },
+  colorLabel: 'Color',
+  colorOptions: {
+    pink: 'Pink',
+    cyan: 'Cyan',
+    violet: 'Violet',
+    rose: 'Rose',
+    purple: 'Purple',
+    red: 'Red',
+    amber: 'Amber',
+    emerald: 'Emerald',
+    blue: 'Blue',
+  },
+  cancelButton: 'Cancel',
+  saveChangesButton: 'Save changes',
+  createCategoryButton: 'Create category',
+  categoryCreated: 'Category created.',
+  categoryUpdated: 'Category updated.',
+  categoryDeleted: 'Category deleted.',
+} satisfies NamespaceDictionary;
+
+export default categories;

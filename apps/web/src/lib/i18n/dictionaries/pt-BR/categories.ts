@@ -1,0 +1,53 @@
+import type { NamespaceDictionary } from '../../types';
+
+const categories = {
+  title: 'Categorias',
+  manageDescription: {
+    one: 'Gerencie sua {count} categoria',
+    other: 'Gerencie suas {count} categorias',
+  },
+  loadingLabel: 'Carregando categorias…',
+  emptyTitle: 'Nenhuma categoria ainda',
+  emptyDescription: 'Categorias ajudam a organizar e filtrar suas tarefas.',
+  newCategoryButton: 'Nova Categoria',
+  newCategoryCard: 'Nova categoria',
+  editAction: 'Editar',
+  deleteAction: 'Excluir',
+  taskCount: { one: '{count} tarefa', other: '{count} tarefas' },
+  editCategoryDialogTitle: 'Editar categoria',
+  createCategoryDialogTitle: 'Nova categoria',
+  nameLabel: 'Nome',
+  namePlaceholder: 'ex.: Trabalho',
+  typeLabel: 'Tipo',
+  typePlaceholder: 'Escolha um tipo',
+  typeOptions: {
+    FITNESS: 'Fitness',
+    HEALTH: 'Saúde',
+    HYGIENE: 'Higiene',
+    NUTRITION: 'Nutrição',
+    STUDY: 'Estudo',
+    WORK: 'Trabalho',
+    HOME: 'Casa',
+    OTHER: 'Outro',
+  },
+  colorLabel: 'Cor',
+  colorOptions: {
+    pink: 'Rosa',
+    cyan: 'Ciano',
+    violet: 'Violeta',
+    rose: 'Rosé',
+    purple: 'Roxo',
+    red: 'Vermelho',
+    amber: 'Âmbar',
+    emerald: 'Esmeralda',
+    blue: 'Azul',
+  },
+  cancelButton: 'Cancelar',
+  saveChangesButton: 'Salvar alterações',
+  createCategoryButton: 'Criar categoria',
+  categoryCreated: 'Categoria criada.',
+  categoryUpdated: 'Categoria atualizada.',
+  categoryDeleted: 'Categoria excluída.',
+} satisfies NamespaceDictionary;
+
+export default categories;

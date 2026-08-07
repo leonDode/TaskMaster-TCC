@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-lint-${{ github.sha }}
+          restore-keys: turbo-lint-
+      - run: pnpm turbo run lint format:check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts exige DIRECT_URL resolvível mesmo só para `generate`
+      # (sem conexão real) — este job não sobe Postgres, então é placeholder.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @task-master/api prisma:generate
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-typecheck-${{ github.sha }}
+          restore-keys: turbo-typecheck-
+      - run: pnpm turbo run typecheck
+
+  unit-test:
+    runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts exige DIRECT_URL resolvível mesmo só para `generate`
+      # (sem conexão real) — este job não sobe Postgres, então é placeholder.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @task-master/api prisma:generate
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-test-${{ github.sha }}
+          restore-keys: turbo-test-
+      - run: pnpm turbo run test
+
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts exige DIRECT_URL resolvível mesmo só para `generate`
+      # (sem conexão real) — este job não sobe Postgres, então é placeholder.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @task-master/api prisma:generate
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-build-${{ github.sha }}
+          restore-keys: turbo-build-
+      - run: pnpm turbo run build
+
+  # e2e e migration-drift-check compartilham o mesmo Postgres efêmero — a
+  # migração real já aplicada pelo e2e-test é o próprio insumo que o drift
+  # check compara contra schema.prisma (--from-config-datasource lê a URL
+  # de prisma.config.ts, que aponta pro Postgres deste job via DIRECT_URL).
+  e2e-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: task_master
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/task_master?schema=public
+      SUPABASE_URL: https://ci-placeholder.supabase.co
+      SUPABASE_JWT_MODE: jwks
+      SUPABASE_JWT_ISSUER: https://ci-placeholder.supabase.co/auth/v1
+      SUPABASE_JWT_AUDIENCE: authenticated
+      NODE_ENV: test
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @task-master/api prisma:generate
+      - name: Aplicar migrations no Postgres efêmero
+        run: pnpm --filter @task-master/api prisma:migrate:deploy
+      - name: Checar drift entre schema.prisma e as migrations aplicadas
+        run: pnpm --filter @task-master/api prisma:migrate:diff-check
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-e2e-${{ github.sha }}
+          restore-keys: turbo-e2e-
+      - run: pnpm turbo run test:e2e
+
+  security-gate:
+    if: false # Desabilitado temporariamente - ver solicitação do usuário
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # gitleaks-action usa o primeiro commit do push como base do range
+      # (`git log <base>^..<head>`). Se esse commit for a raiz do repositório
+      # (sem pai) — como aconteceu no push inicial, que enviou dois commits
+      # de uma vez — o `^` não resolve e o scan falha. Nesse caso, força um
+      # scan de commit único (BASE_REF = HEAD) em vez de um range inválido.
+      - name: Compute safe BASE_REF for gitleaks
+        id: gitleaks_base
+        if: github.event_name == 'push'
+        run: |
+          first_commit="${{ github.event.commits[0].id }}"
+          if [ -n "$first_commit" ] && ! git rev-parse -q --verify "${first_commit}^" > /dev/null; then
+            echo "base_ref=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Secret scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ steps.gitleaks_base.outputs.base_ref }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # TEMPORARIAMENTE NÃO-BLOQUEANTE. O audit consulta a base de advisories
+      # ao vivo, então advisories novos em dependências transitivas (que só o
+      # upstream pode corrigir) derrubavam a CI sem haver ação nossa possível.
+      # As correções já viáveis estão em `overrides` no pnpm-workspace.yaml.
+      # O passo continua rodando e o resultado fica visível no log do job —
+      # para voltar a bloquear, basta remover o `continue-on-error` abaixo.
+      - name: Audit de dependências (bloqueia só high/critical)
+        continue-on-error: true
+        run: pnpm audit --audit-level=high
+
+  semantic-pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
